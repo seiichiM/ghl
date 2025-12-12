@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GitHub App Launcher</title>
+    <style>
+        :root {
+            --primary-color: #2da44e;
+            --bg-color: #0d1117;
+            --card-bg: #161b22;
+            --text-color: #c9d1d9;
+            --border-color: #30363d;
+            --secondary-text: #8b949e;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        h1 {
+            color: var(--text-color);
+            margin-bottom: 20px;
+            font-size: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 600px;
+        }
+
+        .search-box {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            background: var(--card-bg);
+            padding: 15px;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+        }
+
+        input[type="text"] {
+            flex: 1;
+            padding: 10px;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            background: #0d1117;
+            color: var(--text-color);
+            font-size: 16px;
+        }
+
+        button {
+            padding: 10px 20px;
+            border-radius: 6px;
+            border: none;
+            background-color: var(--primary-color);
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        button:hover {
+            background-color: #2c974b;
+        }
+
+        button:disabled {
+            background-color: var(--border-color);
+            cursor: not-allowed;
+        }
+
+        .status {
+            margin-bottom: 15px;
+            font-size: 0.9rem;
+            color: var(--secondary-text);
+            text-align: center;
+            min-height: 1.2em;
+        }
+
+        .repo-list {
+            display: grid;
+            gap: 15px;
+        }
+
+        .repo-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            transition: transform 0.1s;
+        }
+
+        .repo-card:hover {
+            border-color: var(--secondary-text);
+        }
+
+        .repo-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+
+        .repo-name {
+            font-size: 1.1rem;
+            font-weight: bold;
+            color: #58a6ff;
+            text-decoration: none;
+            word-break: break-all;
+        }
+
+        .repo-name:hover {
+            text-decoration: underline;
+        }
+
+        .repo-desc {
+            font-size: 0.9rem;
+            color: var(--secondary-text);
+            margin: 5px 0;
+            line-height: 1.4;
+        }
+
+        .repo-meta {
+            font-size: 0.8rem;
+            color: var(--secondary-text);
+            display: flex;
+            gap: 15px;
+            margin-bottom: 10px;
+        }
+
+        .actions {
+            display: flex;
+            gap: 10px;
+            margin-top: auto;
+        }
+
+        .btn-launch {
+            flex: 1;
+            background-color: #238636;
+            color: white;
+            text-align: center;
+            padding: 8px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-weight: bold;
+            border: 1px solid rgba(240, 246, 252, 0.1);
+        }
+        
+        .btn-launch:hover {
+            background-color: #2ea043;
+        }
+
+        .btn-source {
+            background-color: var(--card-bg);
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+            text-decoration: none;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 0.9rem;
+        }
+
+        .btn-source:hover {
+            background-color: #30363d;
+        }
+
+        .badge-pages {
+            background-color: #1f6feb;
+            color: white;
+            font-size: 0.7rem;
+            padding: 2px 6px;
+            border-radius: 10px;
+            vertical-align: middle;
+            margin-left: 8px;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        /* Loading Spinner */
+        .spinner {
+            border: 4px solid rgba(255, 255, 255, 0.1);
+            border-left-color: var(--primary-color);
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+            vertical-align: middle;
+            margin-right: 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+
+    <!-- PWA Settings -->
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/png" href="icon-192.png">
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('service-worker.js');
+        }
+    </script>
+</head>
+<body>
+
+    <h1>
+        <svg height="32" viewBox="0 0 16 16" version="1.1" width="32" aria-hidden="true" fill="white"><path d="M8 0c4.42 0 8 3.58 8 8a8.013 8.013 0 0 1-5.45 7.59c-.4.08-.55-.17-.55-.38 0-.27.01-1.13.01-2.2 0-.75-.25-1.23-.54-1.48 1.78-.2 3.65-.88 3.65-3.95 0-.88-.31-1.59-.82-2.15.08-.2.36-1.02-.08-2.12 0 0-.67-.22-2.2.82-.64-.18-1.32-.27-2-.27-.68 0-1.36.09-2 .27-1.53-1.03-2.2-.82-2.2-.82-.44 1.1-.16 1.92-.08 2.12-.51.56-.82 1.28-.82 2.15 0 3.06 1.86 3.75 3.64 3.95-.23.2-.44.55-.51 1.07-.46.12-1.61.45-2.32-.82-.36-.66-.88-.71-.88-.71-.56-.05-.04.34.04.37.42.59 1.08 1.17 1.77 1.57.37.21.78.36 1.21.43 0 .86.01 1.66.01 1.88 0 .21-.15.46-.55.38A8.013 8.013 0 0 1 0 8c0-4.42 3.58-8 8-8Z"></path></svg>
+        GitHub Launcher
+    </h1>
+
+    <div class="container">
+        <div class="search-box">
+            <input type="text" id="usernameInput" placeholder="GitHub Username" value="">
+            <button id="loadBtn" onclick="loadRepositories()">Load</button>
+        </div>
+
+        <div id="status" class="status">Enter a username to load repositories.</div>
+        <div id="repoList" class="repo-list"></div>
+    </div>
+
+    <script>
+        const API_BASE = 'https://api.github.com';
+        
+        // 以前の入力を復元
+        window.onload = () => {
+            const savedUser = localStorage.getItem('gh_launcher_username');
+            if (savedUser) {
+                document.getElementById('usernameInput').value = savedUser;
+                loadRepositories();
+            }
+        };
+
+        async function loadRepositories() {
+            const username = document.getElementById('usernameInput').value.trim();
+            const statusEl = document.getElementById('status');
+            const listEl = document.getElementById('repoList');
+            const btn = document.getElementById('loadBtn');
+
+            if (!username) {
+                statusEl.textContent = 'Please enter a username.';
+                return;
+            }
+
+            localStorage.setItem('gh_launcher_username', username);
+
+            // UI Reset
+            listEl.innerHTML = '';
+            statusEl.innerHTML = '<div class="spinner"></div> Fetching repositories...';
+            btn.disabled = true;
+
+            try {
+                // 1. ユーザー情報の確認とリポジトリ取得
+                // per_page=100 で最大100件取得 (ページネーションは今回は簡易版として省略)
+                const response = await fetch(`${API_BASE}/users/${username}/repos?sort=updated&per_page=100&type=all`);
+                
+                if (!response.ok) {
+                    if (response.status === 404) throw new Error('User not found');
+                    if (response.status === 403) throw new Error('API Rate limit exceeded. Try again later.');
+                    throw new Error(`Error: ${response.status}`);
+                }
+
+                const repos = await response.json();
+
+                if (repos.length === 0) {
+                    statusEl.textContent = 'No repositories found.';
+                    btn.disabled = false;
+                    return;
+                }
+
+                statusEl.textContent = `Found ${repos.length} repositories. Checking for web apps...`;
+
+                // リポジトリをレンダリング
+                // GitHub Pagesが有効(has_pages)なものを優先
+                repos.sort((a, b) => (b.has_pages === a.has_pages) ? 0 : b.has_pages ? 1 : -1);
+
+                repos.forEach(repo => {
+                    const card = createRepoCard(repo, username);
+                    listEl.appendChild(card);
+                });
+
+                statusEl.textContent = `Displaying ${repos.length} repositories for ${username}`;
+
+            } catch (error) {
+                console.error(error);
+                statusEl.textContent = error.message;
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        function createRepoCard(repo, username) {
+            const div = document.createElement('div');
+            div.className = 'repo-card';
+
+            const hasPages = repo.has_pages;
+            // Pagesが有効ならそのURL、無ければ推測されるURL
+            // GitHub Pages URL logic: https://<user>.github.io/<repo>/
+            const pagesUrl = `https://${username}.github.io/${repo.name}/`;
+            
+            // 日付フォーマット
+            const updatedDate = new Date(repo.updated_at).toLocaleDateString();
+
+            let launchButtonHtml = '';
+            
+            if (hasPages) {
+                launchButtonHtml = `<a href="${pagesUrl}" target="_blank" class="btn-launch">🚀 Launch App</a>`;
+            } else {
+                // Pagesが無効でも、ユーザーが強制的に試せるようにする（隠し機能的だが便利）
+                // ただしデザイン上は少しトーンダウンさせる
+                launchButtonHtml = `<a href="${pagesUrl}" target="_blank" class="btn-launch" style="background-color: #30363d; border-color: #8b949e;">❓ Try Open (index.html)</a>`;
+            }
+
+            const description = repo.description || 'No description provided.';
+
+            div.innerHTML = `
+                <div class="repo-header">
+                    <a href="${repo.html_url}" target="_blank" class="repo-name">
+                        ${repo.name}
+                        ${hasPages ? '<span class="badge-pages">Pages Active</span>' : ''}
+                    </a>
+                </div>
+                <div class="repo-desc">${escapeHtml(description)}</div>
+                <div class="repo-meta">
+                    <span>⭐ ${repo.stargazers_count}</span>
+                    <span>🍴 ${repo.forks_count}</span>
+                    <span>Language: ${repo.language || 'Unknown'}</span>
+                    <span>Updated: ${updatedDate}</span>
+                </div>
+                <div class="actions">
+                    ${launchButtonHtml}
+                    <a href="${repo.html_url}" target="_blank" class="btn-source">View Source</a>
+                </div>
+            `;
+
+            return div;
+        }
+
+        function escapeHtml(unsafe) {
+            return unsafe
+                 .replace(/&/g, "&amp;")
+                 .replace(/</g, "&lt;")
+                 .replace(/>/g, "&gt;")
+                 .replace(/"/g, "&quot;")
+                 .replace(/'/g, "&#039;");
+        }
+    </script>
+</body>
+</html>
