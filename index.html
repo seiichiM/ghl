@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GitHub App Launcher</title>
-    <!-- Markdown Parser -->
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <!-- Markdown Parser (Stable Version 4.3.0) -->
+    <script src="https://cdn.jsdelivr.net/npm/marked@4.3.0/marked.min.js"></script>
     <style>
         :root {
             --primary-color: #2da44e;
@@ -40,7 +40,7 @@
 
         .container {
             width: 100%;
-            max-width: 800px; /* READMEが見やすいように少し幅を広げました */
+            max-width: 800px;
         }
 
         .search-box {
@@ -205,7 +205,7 @@
             margin-top: 15px;
             padding-top: 15px;
             border-top: 1px solid var(--border-color);
-            display: none; /* Hidden by default */
+            display: none;
         }
 
         .readme-content {
@@ -220,6 +220,7 @@
             border-bottom: 1px solid var(--border-color);
             padding-bottom: 0.3em;
             margin-top: 1.5em;
+            color: var(--text-color);
         }
         .readme-content a { color: var(--link-color); }
         .readme-content code {
@@ -241,7 +242,7 @@
         .readme-content img {
             max-width: 100%;
             height: auto;
-            background-color: white; /* For transparent PNGs */
+            background-color: transparent;
             border-radius: 6px;
         }
         .readme-content blockquote {
@@ -249,6 +250,10 @@
             margin: 0;
             padding-left: 1em;
             color: var(--secondary-text);
+        }
+        
+        .readme-content ul, .readme-content ol {
+            padding-left: 20px;
         }
 
         /* Loading Spinner */
@@ -365,6 +370,8 @@
             const hasPages = repo.has_pages;
             const pagesUrl = `https://${username}.github.io/${repo.name}/`;
             const updatedDate = new Date(repo.updated_at).toLocaleDateString();
+            // Default branch name is needed for constructing raw content URLs
+            const defaultBranch = repo.default_branch || 'master';
 
             let launchButtonHtml = '';
             
@@ -374,7 +381,11 @@
                 launchButtonHtml = `<a href="${pagesUrl}" target="_blank" class="btn-launch" style="background-color: #30363d; border-color: #8b949e;">❓ Try Open (index.html)</a>`;
             }
 
-            const description = repo.description || 'No description provided.';
+            // Descriptionがある場合のみHTMLを生成
+            const descriptionHtml = repo.description 
+                ? `<div class="repo-desc">${escapeHtml(repo.description)}</div>` 
+                : '';
+            
             const repoId = `repo-${repo.id}`;
 
             div.innerHTML = `
@@ -384,7 +395,7 @@
                         ${hasPages ? '<span class="badge-pages">Pages Active</span>' : ''}
                     </a>
                 </div>
-                <div class="repo-desc">${escapeHtml(description)}</div>
+                ${descriptionHtml}
                 <div class="repo-meta">
                     <span>⭐ ${repo.stargazers_count}</span>
                     <span>🍴 ${repo.forks_count}</span>
@@ -393,10 +404,9 @@
                 </div>
                 <div class="actions">
                     ${launchButtonHtml}
-                    <button class="btn-secondary" onclick="toggleReadme('${username}', '${repo.name}', '${repoId}')">
+                    <button class="btn-secondary" onclick="toggleReadme('${username}', '${repo.name}', '${repoId}', '${defaultBranch}')">
                         📖 Readme
                     </button>
-                    <a href="${repo.html_url}" target="_blank" class="btn-secondary">Source</a>
                 </div>
                 <div id="${repoId}-readme" class="readme-container">
                     <div id="${repoId}-content" class="readme-content"></div>
@@ -406,7 +416,7 @@
             return div;
         }
 
-        async function toggleReadme(username, repoName, elementId) {
+        async function toggleReadme(username, repoName, elementId, defaultBranch) {
             const container = document.getElementById(`${elementId}-readme`);
             const content = document.getElementById(`${elementId}-content`);
 
@@ -417,7 +427,6 @@
 
             container.style.display = 'block';
 
-            // すでに読み込み済みなら再取得しない
             if (content.innerHTML.trim() !== '') {
                 return;
             }
@@ -425,13 +434,13 @@
             content.innerHTML = '<div class="spinner"></div> Loading README...';
 
             try {
-                // Header 'Accept: application/vnd.github.v3.raw' を使うとRaw Markdownが返ってくる
+                // Fetch Readme Raw Content
                 const response = await fetch(`${API_BASE}/repos/${username}/${repoName}/readme`, {
                     headers: { 'Accept': 'application/vnd.github.v3.raw' }
                 });
 
                 if (response.status === 404) {
-                    content.innerHTML = '<span style="color: #8b949e;">No README.md found in this repository.</span>';
+                    content.innerHTML = '<span style="color: #8b949e;">No README.md found.</span>';
                     return;
                 }
 
@@ -440,12 +449,19 @@
                 }
 
                 const markdown = await response.text();
-                // marked.parse でHTMLに変換
+                
+                // Configure marked to handle relative paths for images
+                const baseUrl = `https://raw.githubusercontent.com/${username}/${repoName}/${defaultBranch}/`;
+                
+                marked.setOptions({
+                    baseUrl: baseUrl
+                });
+
                 content.innerHTML = marked.parse(markdown);
 
             } catch (error) {
                 console.error(error);
-                content.innerHTML = `<span style="color: #f85149;">Error loading README: ${error.message}</span>`;
+                content.innerHTML = `<span style="color: #f85149;">Error loading README: ${error.message}</span><br><span style="font-size:0.8em; color:#8b949e;">Please check console for details.</span>`;
             }
         }
 
