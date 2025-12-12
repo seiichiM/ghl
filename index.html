@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GitHub App Launcher</title>
+    <!-- Markdown Parser -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
         :root {
             --primary-color: #2da44e;
@@ -12,6 +14,7 @@
             --text-color: #c9d1d9;
             --border-color: #30363d;
             --secondary-text: #8b949e;
+            --link-color: #58a6ff;
         }
 
         body {
@@ -37,7 +40,7 @@
 
         .container {
             width: 100%;
-            max-width: 600px;
+            max-width: 800px; /* READMEが見やすいように少し幅を広げました */
         }
 
         .search-box {
@@ -101,7 +104,7 @@
             display: flex;
             flex-direction: column;
             gap: 10px;
-            transition: transform 0.1s;
+            transition: border-color 0.2s;
         }
 
         .repo-card:hover {
@@ -117,7 +120,7 @@
         .repo-name {
             font-size: 1.1rem;
             font-weight: bold;
-            color: #58a6ff;
+            color: var(--link-color);
             text-decoration: none;
             word-break: break-all;
         }
@@ -139,16 +142,18 @@
             display: flex;
             gap: 15px;
             margin-bottom: 10px;
+            flex-wrap: wrap;
         }
 
         .actions {
             display: flex;
             gap: 10px;
             margin-top: auto;
+            flex-wrap: wrap;
         }
 
         .btn-launch {
-            flex: 1;
+            flex: 2;
             background-color: #238636;
             color: white;
             text-align: center;
@@ -157,23 +162,31 @@
             text-decoration: none;
             font-weight: bold;
             border: 1px solid rgba(240, 246, 252, 0.1);
+            min-width: 120px;
         }
         
         .btn-launch:hover {
             background-color: #2ea043;
         }
 
-        .btn-source {
+        .btn-secondary {
+            flex: 1;
             background-color: var(--card-bg);
-            color: var(--text-color);
+            color: var(--link-color);
             border: 1px solid var(--border-color);
             text-decoration: none;
             padding: 8px 12px;
             border-radius: 6px;
             font-size: 0.9rem;
+            text-align: center;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
         }
 
-        .btn-source:hover {
+        .btn-secondary:hover {
             background-color: #30363d;
         }
 
@@ -187,21 +200,66 @@
             margin-left: 8px;
         }
 
-        .hidden {
-            display: none;
+        /* README Viewer Styles */
+        .readme-container {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid var(--border-color);
+            display: none; /* Hidden by default */
+        }
+
+        .readme-content {
+            font-size: 0.9rem;
+            line-height: 1.6;
+            overflow-x: auto;
+            color: var(--text-color);
+        }
+        
+        /* Markdown Styles within Readme */
+        .readme-content h1, .readme-content h2, .readme-content h3 {
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 0.3em;
+            margin-top: 1.5em;
+        }
+        .readme-content a { color: var(--link-color); }
+        .readme-content code {
+            background-color: rgba(110, 118, 129, 0.4);
+            padding: 0.2em 0.4em;
+            border-radius: 6px;
+            font-family: monospace;
+        }
+        .readme-content pre {
+            background-color: #161b22;
+            padding: 16px;
+            border-radius: 6px;
+            overflow: auto;
+        }
+        .readme-content pre code {
+            background-color: transparent;
+            padding: 0;
+        }
+        .readme-content img {
+            max-width: 100%;
+            height: auto;
+            background-color: white; /* For transparent PNGs */
+            border-radius: 6px;
+        }
+        .readme-content blockquote {
+            border-left: 4px solid var(--border-color);
+            margin: 0;
+            padding-left: 1em;
+            color: var(--secondary-text);
         }
 
         /* Loading Spinner */
         .spinner {
-            border: 4px solid rgba(255, 255, 255, 0.1);
+            border: 3px solid rgba(255, 255, 255, 0.1);
             border-left-color: var(--primary-color);
             border-radius: 50%;
-            width: 24px;
-            height: 24px;
+            width: 16px;
+            height: 16px;
             animation: spin 1s linear infinite;
             display: inline-block;
-            vertical-align: middle;
-            margin-right: 10px;
         }
 
         @keyframes spin {
@@ -239,7 +297,6 @@
     <script>
         const API_BASE = 'https://api.github.com';
         
-        // 以前の入力を復元
         window.onload = () => {
             const savedUser = localStorage.getItem('gh_launcher_username');
             if (savedUser) {
@@ -261,14 +318,11 @@
 
             localStorage.setItem('gh_launcher_username', username);
 
-            // UI Reset
             listEl.innerHTML = '';
             statusEl.innerHTML = '<div class="spinner"></div> Fetching repositories...';
             btn.disabled = true;
 
             try {
-                // 1. ユーザー情報の確認とリポジトリ取得
-                // per_page=100 で最大100件取得 (ページネーションは今回は簡易版として省略)
                 const response = await fetch(`${API_BASE}/users/${username}/repos?sort=updated&per_page=100&type=all`);
                 
                 if (!response.ok) {
@@ -285,10 +339,8 @@
                     return;
                 }
 
-                statusEl.textContent = `Found ${repos.length} repositories. Checking for web apps...`;
+                statusEl.textContent = `Found ${repos.length} repositories.`;
 
-                // リポジトリをレンダリング
-                // GitHub Pagesが有効(has_pages)なものを優先
                 repos.sort((a, b) => (b.has_pages === a.has_pages) ? 0 : b.has_pages ? 1 : -1);
 
                 repos.forEach(repo => {
@@ -311,11 +363,7 @@
             div.className = 'repo-card';
 
             const hasPages = repo.has_pages;
-            // Pagesが有効ならそのURL、無ければ推測されるURL
-            // GitHub Pages URL logic: https://<user>.github.io/<repo>/
             const pagesUrl = `https://${username}.github.io/${repo.name}/`;
-            
-            // 日付フォーマット
             const updatedDate = new Date(repo.updated_at).toLocaleDateString();
 
             let launchButtonHtml = '';
@@ -323,12 +371,11 @@
             if (hasPages) {
                 launchButtonHtml = `<a href="${pagesUrl}" target="_blank" class="btn-launch">🚀 Launch App</a>`;
             } else {
-                // Pagesが無効でも、ユーザーが強制的に試せるようにする（隠し機能的だが便利）
-                // ただしデザイン上は少しトーンダウンさせる
                 launchButtonHtml = `<a href="${pagesUrl}" target="_blank" class="btn-launch" style="background-color: #30363d; border-color: #8b949e;">❓ Try Open (index.html)</a>`;
             }
 
             const description = repo.description || 'No description provided.';
+            const repoId = `repo-${repo.id}`;
 
             div.innerHTML = `
                 <div class="repo-header">
@@ -346,14 +393,64 @@
                 </div>
                 <div class="actions">
                     ${launchButtonHtml}
-                    <a href="${repo.html_url}" target="_blank" class="btn-source">View Source</a>
+                    <button class="btn-secondary" onclick="toggleReadme('${username}', '${repo.name}', '${repoId}')">
+                        📖 Readme
+                    </button>
+                    <a href="${repo.html_url}" target="_blank" class="btn-secondary">Source</a>
+                </div>
+                <div id="${repoId}-readme" class="readme-container">
+                    <div id="${repoId}-content" class="readme-content"></div>
                 </div>
             `;
 
             return div;
         }
 
+        async function toggleReadme(username, repoName, elementId) {
+            const container = document.getElementById(`${elementId}-readme`);
+            const content = document.getElementById(`${elementId}-content`);
+
+            if (container.style.display === 'block') {
+                container.style.display = 'none';
+                return;
+            }
+
+            container.style.display = 'block';
+
+            // すでに読み込み済みなら再取得しない
+            if (content.innerHTML.trim() !== '') {
+                return;
+            }
+
+            content.innerHTML = '<div class="spinner"></div> Loading README...';
+
+            try {
+                // Header 'Accept: application/vnd.github.v3.raw' を使うとRaw Markdownが返ってくる
+                const response = await fetch(`${API_BASE}/repos/${username}/${repoName}/readme`, {
+                    headers: { 'Accept': 'application/vnd.github.v3.raw' }
+                });
+
+                if (response.status === 404) {
+                    content.innerHTML = '<span style="color: #8b949e;">No README.md found in this repository.</span>';
+                    return;
+                }
+
+                if (!response.ok) {
+                    throw new Error(`Failed to load README (${response.status})`);
+                }
+
+                const markdown = await response.text();
+                // marked.parse でHTMLに変換
+                content.innerHTML = marked.parse(markdown);
+
+            } catch (error) {
+                console.error(error);
+                content.innerHTML = `<span style="color: #f85149;">Error loading README: ${error.message}</span>`;
+            }
+        }
+
         function escapeHtml(unsafe) {
+            if (!unsafe) return "";
             return unsafe
                  .replace(/&/g, "&amp;")
                  .replace(/</g, "&lt;")
